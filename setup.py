@@ -6,7 +6,7 @@ setup(
     author='Kyrielight',
     packages=['ayumi'],
     install_requires=['dynaconf'],
-    version='0.1',
+    version='0.2',
     license='MIT',
-    description='Custom logger for the Izumi and Nagi projects'
+    description='RabbitMQ-wrapping logger.'
 )

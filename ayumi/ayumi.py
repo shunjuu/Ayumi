@@ -25,7 +25,22 @@ except:
     _RABBITPY_IMPORTED = False
 
 
-class AyumiColors:
+class Ayumi():
+
+    pika_channel = None
+    rabbitpy_channel = None
+
+    _AMPQ_EXCHANGE = settings.get("log_exchange", "logs_gateway")
+    _CONSOLE_FORMAT = settings.get(
+        "log_console_format", "[{filename}:{functionname}]: {msg}")
+    _DATE_FORMAT = settings.get("log_date_format", "%a|%b%y|%X|%Z")
+    _LOG_FORMAT = settings.get(
+        "log_logger_format", "[%(asctime)s][%(levelname)s]: %(message)s")
+
+    logging.basicConfig(format=_LOG_FORMAT, datefmt=_DATE_FORMAT)
+    logger = logging.getLogger() # Use root logger so all other apps can output too.
+    logger.setLevel(logging.getLevelName(settings.get("log_level", "NOTSET").upper()))
+
 
     RED = '\033[31m'
     GREEN = '\033[32m'
@@ -43,22 +58,6 @@ class AyumiColors:
 
     _ENDC = '\033[0m'
 
-
-class AyumiHelper(type):
-
-    pika_channel = None
-    rabbitpy_channel = None
-
-    _AMPQ_EXCHANGE = settings.get("log_exchange", "logs_gateway")
-    _CONSOLE_FORMAT = settings.get(
-        "log_console_format", "[{filename}:{functionname}]: {msg}")
-    _DATE_FORMAT = settings.get("log_date_format", "%a|%b%y|%X|%Z")
-    _LOG_FORMAT = settings.get(
-        "log_logger_format", "[%(asctime)s][%(levelname)s]: %(message)s")
-
-    logging.basicConfig(format=_LOG_FORMAT, datefmt=_DATE_FORMAT)
-    logger = logging.getLogger() # Use root logger so all other apps can output too.
-    logger.setLevel(logging.getLevelName(settings.get("log_level", "NOTSET")))
 
     @classmethod
     def get_logger(cls) -> logging.Logger:
@@ -108,13 +107,13 @@ class AyumiHelper(type):
 
     @classmethod
     def _console(cls, msg: str, color: str) -> None:
-        filename, functionname = AyumiHelper.get_calling_details()
+        filename, functionname = Ayumi.get_calling_details()
         getattr(cls.logger, currentframe().f_back.f_code.co_name)("{}{}{}".format(
             color,
             cls._CONSOLE_FORMAT.format(
                 filename=filename, functionname=functionname, msg=msg
             ),
-            AyumiColors._ENDC
+            cls._ENDC
         ))
 
     @classmethod
@@ -133,7 +132,7 @@ class AyumiHelper(type):
                 properties=pika.BasicProperties(
                     content_type="application/json",
                     delivery_mode=2,
-                    headers=AyumiHelper.get_headers(),
+                    headers=Ayumi.get_headers(),
                     timestamp=int(time())
                 )
             )
@@ -146,7 +145,7 @@ class AyumiHelper(type):
                 properties={
                     "content_type": "application/json",
                     "delivery_mode": 2,
-                    "headers": AyumiHelper.get_headers(),
+                    "headers": Ayumi.get_headers(),
                     "timestamp": int(time())
                 })
             message.publish(cls._AMPQ_EXCHANGE, currentframe().f_back.f_code.co_name.lower())
@@ -166,7 +165,7 @@ class AyumiHelper(type):
         # The third object in the tuple is the function name
         functionname = str(frame[3])
         module = getmodule(frame[0])
-        filename = AyumiHelper.get_base_filename(module.__file__)
+        filename = Ayumi.get_base_filename(module.__file__)
         return (filename, functionname)
 
     @staticmethod
