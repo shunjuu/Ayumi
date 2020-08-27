@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='ayumi',
-    url='https://github.com/Kyrielight/Ayumi',
+    url='https://github.com/shunjuu/Ayumi',
     author='Kyrielight',
     packages=['ayumi'],
     install_requires=['dynaconf'],
