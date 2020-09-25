@@ -6,7 +6,7 @@ setup(
     author='Kyrielight',
     packages=['ayumi'],
     install_requires=['dynaconf'],
-    version='0.2',
+    version='0.3',
     license='MIT',
     description='RabbitMQ-wrapping logger.'
 )
