@@ -12,34 +12,53 @@ from socket import getfqdn
 from time import time
 from typing import Dict, Tuple
 
+_SETTINGS_PREFIX = "AYUMI_"
+
+_EXCHANGE = "logs-gateway"
+_CONSOLE_FORMAT = "[{filename}:{functionname}]: {msg}"
+_DATE_FORMAT = "%a|%b%y|%X|%Z"
+_LOG_FORMAT = "[%(asctime)s][%(levelname)s]: %(message)s"
+_LOG_LEVEL = "NOTSET"
+
+# Try loading from Dynaconf 3.1.1, and the legacy Dynaconf afterwards
+try:
+    from config import settings
+    _EXCHANGE = settings.get(_SETTINGS_PREFIX + "EXCHANGE", _EXCHANGE)
+    _CONSOLE_FORMAT = settings.get(_SETTINGS_PREFIX + "CONSOLE_FORMAT", _CONSOLE_FORMAT)
+    _DATE_FORMAT = settings.get(_SETTINGS_PREFIX + "DATE_FORMAT", _DATE_FORMAT)
+    _LOG_FORMAT = settings.get(_SETTINGS_PREFIX + "LOG_FORMAT", _LOG_FORMAT)
+    _LOG_LEVEL = settings.get(_SETTINGS_PREFIX + "LOG_LEVEL", _LOG_LEVEL)
+except ImportError:
+    try:
+        from dynaconf import settings
+        _EXCHANGE = settings.get(_SETTINGS_PREFIX + "EXCHANGE", _EXCHANGE)
+        _CONSOLE_FORMAT = settings.get(_SETTINGS_PREFIX + "CONSOLE_FORMAT", _CONSOLE_FORMAT)
+        _DATE_FORMAT = settings.get(_SETTINGS_PREFIX + "DATE_FORMAT", _DATE_FORMAT)
+        _LOG_FORMAT = settings.get(_SETTINGS_PREFIX + "LOG_FORMAT", _LOG_FORMAT)
+        _LOG_LEVEL = settings.get(_SETTINGS_PREFIX + "LOG_LEVEL", _LOG_LEVEL)
+    except ImportError:
+        pass
+
 try:
     import pika
     _PIKA_IMPORTED = True
-except:
+except ImportError:
     _PIKA_IMPORTED = False
 
 try:
     import rabbitpy
     _RABBITPY_IMPORTED = True
-except:
+except ImportError:
     _RABBITPY_IMPORTED = False
-
 
 class Ayumi():
 
     pika_channel = None
     rabbitpy_channel = None
 
-    _AMPQ_EXCHANGE = settings.get("log_exchange", "logs_gateway")
-    _CONSOLE_FORMAT = settings.get(
-        "log_console_format", "[{filename}:{functionname}]: {msg}")
-    _DATE_FORMAT = settings.get("log_date_format", "%a|%b%y|%X|%Z")
-    _LOG_FORMAT = settings.get(
-        "log_logger_format", "[%(asctime)s][%(levelname)s]: %(message)s")
-
     logging.basicConfig(format=_LOG_FORMAT, datefmt=_DATE_FORMAT)
     logger = logging.getLogger() # Use root logger so all other apps can output too.
-    logger.setLevel(logging.getLevelName(settings.get("log_level", "NOTSET").upper()))
+    logger.setLevel(logging.getLevelName(_LOG_LEVEL.upper()))
 
 
     RED = '\033[31m'
@@ -110,7 +129,7 @@ class Ayumi():
         filename, functionname = Ayumi.get_calling_details()
         getattr(cls.logger, currentframe().f_back.f_code.co_name)("{}{}{}".format(
             color,
-            cls._CONSOLE_FORMAT.format(
+            _CONSOLE_FORMAT.format(
                 filename=filename, functionname=functionname, msg=msg
             ),
             cls._ENDC
@@ -127,7 +146,7 @@ class Ayumi():
         if _PIKA_IMPORTED and cls.pika_channel:
             cls.pika_channel.basic_publish(
                 body=dumps({"body": msg, "color": color}),
-                exchange=cls._AMPQ_EXCHANGE,
+                exchange=_EXCHANGE,
                 routing_key=currentframe().f_back.f_code.co_name.lower(),
                 properties=pika.BasicProperties(
                     content_type="application/json",
@@ -148,7 +167,7 @@ class Ayumi():
                     "headers": Ayumi.get_headers(),
                     "timestamp": int(time())
                 })
-            message.publish(cls._AMPQ_EXCHANGE, currentframe().f_back.f_code.co_name.lower())
+            message.publish(_EXCHANGE, currentframe().f_back.f_code.co_name.lower())
 
     @staticmethod
     def get_headers() -> Dict[str, str]:
