@@ -14,7 +14,7 @@ from typing import Dict, Tuple
 
 _SETTINGS_PREFIX = "AYUMI_"
 
-_EXCHANGE = "logs-gateway"
+_EXCHANGE = None
 _CONSOLE_FORMAT = "[{filename}:{functionname}]: {msg}"
 _DATE_FORMAT = "%a|%b%y|%X|%Z"
 _LOG_FORMAT = "[%(asctime)s][%(levelname)s]: %(message)s"
@@ -137,6 +137,10 @@ class Ayumi():
 
     @classmethod
     def _publish(cls, msg: str, color: str) -> None:
+
+        # Don't send if there is no registered exchange
+        if not _EXCHANGE:
+            return
 
         # Color can be an empty string, so convert that to None for JSON.
         if not color:
