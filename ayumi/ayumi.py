@@ -125,15 +125,20 @@ class Ayumi():
     """
 
     @classmethod
-    def _console(cls, msg: str, color: str) -> None:
-        filename, functionname = Ayumi.get_calling_details()
-        getattr(cls.logger, currentframe().f_back.f_code.co_name)("{}{}{}".format(
+    def _genstring(cls, msg: str, color: str, filename: str, functionname: str):
+        return "{}{}{}".format(
             color,
             _CONSOLE_FORMAT.format(
-                filename=filename, functionname=functionname, msg=msg
+                filename=filename,
+                functionname=functionname,
+                msg=msg
             ),
-            cls._ENDC
-        ))
+            cls._ENDC)
+
+    @classmethod
+    def _console(cls, msg: str, color: str) -> None:
+        filename, functionname = Ayumi.get_calling_details()
+        getattr(cls.logger, currentframe().f_back.f_code.co_name)(cls._genstring(msg, color, filename, functionname))
 
     @classmethod
     def _publish(cls, msg: str, color: str) -> None:
@@ -146,32 +151,61 @@ class Ayumi():
         if not color:
             color = None
 
-        # Publish to Pika
-        if _PIKA_IMPORTED and cls.pika_channel:
-            cls.pika_channel.basic_publish(
-                body=dumps({"body": msg, "color": color}),
-                exchange=_EXCHANGE,
-                routing_key=currentframe().f_back.f_code.co_name.lower(),
-                properties=pika.BasicProperties(
-                    content_type="application/json",
-                    delivery_mode=2,
-                    headers=Ayumi.get_headers(),
-                    timestamp=int(time())
-                )
-            )
+        cls._publish_pika(msg, color)
+        cls._publish_rabbitpy(msg, color)
 
-        # Publish to RabbitPy
+    @classmethod
+    def _publish_pika(cls, msg: str, color: str):
+        if _PIKA_IMPORTED and cls.pika_channel:
+            try:
+                cls.pika_channel.basic_publish(
+                    body=dumps({"body": msg, "color": color}),
+                    exchange=_EXCHANGE,
+                    routing_key=currentframe().f_back.f_back.f_code.co_name.lower(),
+                    properties=pika.BasicProperties(
+                        content_type="application/json",
+                        delivery_mode=2,
+                        headers=Ayumi.get_headers(),
+                        timestamp=int(time())
+                    )
+                )
+            except:
+                filename, functionname = Ayumi.get_calling_details(2)
+                cls.logger.warning(
+                    cls._genstring(
+                        "Unable to publish via Pika; is the connection dropped?",
+                        cls.RED,
+                        filename,
+                        functionname
+                    )
+                )
+
+    @classmethod
+    def _publish_rabbitpy(cls, msg: str, color: str):
         if _RABBITPY_IMPORTED and cls.rabbitpy_channel:
-            message = rabbitpy.Message(
-                cls.rabbitpy_channel,
-                dumps({"body": msg, "color": color}),
-                properties={
-                    "content_type": "application/json",
-                    "delivery_mode": 2,
-                    "headers": Ayumi.get_headers(),
-                    "timestamp": int(time())
-                })
-            message.publish(_EXCHANGE, currentframe().f_back.f_code.co_name.lower())
+            try:
+                message = rabbitpy.Message(
+                    cls.rabbitpy_channel,
+                    dumps({"body": msg, "color": color}),
+                    properties={
+                        "content_type": "application/json",
+                        "delivery_mode": 2,
+                        "headers": Ayumi.get_headers(),
+                        "timestamp": int(time())
+                    })
+                message.publish(_EXCHANGE, currentframe().f_back.f_back.f_code.co_name.lower())
+            except:
+                filename, functionname = Ayumi.get_calling_details(1)
+                cls.logger.warning(
+                    cls._genstring(
+                        "Unable to publish via RabbitPy; is the connection dropped?",
+                        cls.RED,
+                        filename,
+                        functionname
+                    )
+                )
+
+    # Helper methods
 
     @staticmethod
     def get_headers() -> Dict[str, str]:
@@ -183,7 +217,7 @@ class Ayumi():
     @staticmethod
     def get_calling_details(level: int = 3) -> Tuple[str, str]:
         """Gets the name of the file that called a logging function for logging output"""
-        # Set to 2, because it's a second level up calling trace
+        # Set to 3, because it's default third level up calling trace
         frame = stack()[level]
         # The third object in the tuple is the function name
         functionname = str(frame[3])
